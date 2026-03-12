@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Таблица Менделеева</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #08090e;
+    --surface: #0f1117;
+    --border: #1e2235;
+    --text: #c8d0e8;
+    --dim: #4a5272;
+    --accent: #00e5ff;
+
+    --alkali:      #ff5c6e;
+    --alkaline:    #ff9f43;
+    --transition:  #4e9dff;
+    --post:        #a29bfe;
+    --metalloid:   #55efc4;
+    --nonmetal:    #fdcb6e;
+    --halogen:     #fd79a8;
+    --noble:       #74b9ff;
+    --lanthanide:  #e17055;
+    --actinide:    #6c5ce7;
+    --unknown:     #636e72;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Exo 2', sans-serif;
+    min-height: 100vh;
+    overflow-x: auto;
+    padding: 20px 10px 40px;
+  }
+
+  h1 {
+    text-align: center;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: clamp(16px, 3vw, 28px);
+    letter-spacing: 6px;
+    color: var(--accent);
+    text-shadow: 0 0 20px rgba(0,229,255,.4);
+    margin-bottom: 6px;
+  }
+
+  .subtitle {
+    text-align: center;
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: var(--dim);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+
+  /* ── LEGEND ─────────────────────────────── */
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px 14px;
+    margin-bottom: 18px;
+    font-size: 10px;
+    letter-spacing: 1px;
+  }
+  .legend-item { display: flex; align-items: center; gap: 5px; cursor: pointer; opacity: .8; transition: opacity .2s; }
+  .legend-item:hover { opacity: 1; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+
+  /* ── GRID ────────────────────────────────── */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(18, minmax(44px, 58px));
+    grid-auto-rows: minmax(44px, 58px);
+    gap: 3px;
+    justify-content: center;
+    margin: 0 auto;
+    max-width: 1100px;
+  }
+
+  /* ── CELL ────────────────────────────────── */
+  .el {
+    position: relative;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: transform .15s, box-shadow .15s, border-color .15s;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 2px;
+    background: var(--surface);
+    user-select: none;
+  }
+  .el:hover {
+    transform: scale(1.18);
+    z-index: 10;
+    box-shadow: 0 0 18px 2px var(--cat-color);
+    border-color: var(--cat-color);
+  }
+  .el .num  { font-size: 8px; color: var(--dim); font-family: 'Share Tech Mono', monospace; }
+  .el .sym  { font-size: clamp(13px, 1.8vw, 18px); font-weight: 700; line-height: 1.1; }
+  .el .name { font-size: 6px; text-align: center; color: var(--dim); line-height: 1.2; }
+  .el .mass { font-size: 6px; color: var(--dim); font-family: 'Share Tech Mono', monospace; }
+
+  /* Category colors applied via inline --cat-color + tinted bg */
+  .el { background: color-mix(in srgb, var(--cat-color) 12%, var(--surface)); }
+  .el .sym { color: var(--cat-color); text-shadow: 0 0 8px color-mix(in srgb, var(--cat-color) 60%, transparent); }
+
+  /* spacer cells */
+  .spacer { background: transparent; border: none; cursor: default; }
+  .spacer:hover { transform: none; box-shadow: none; }
+
+  /* label cells (period numbers, series labels) */
+  .lbl {
+    background: transparent; border: none; cursor: default;
+    font-size: 9px; color: var(--dim); font-family: 'Share Tech Mono', monospace;
+    display: flex; align-items: center; justify-content: center;
+    letter-spacing: 1px;
+  }
+  .lbl:hover { transform: none; box-shadow: none; }
+
+  /* lanthanide/actinide row gap */
+  .gap-row { height: 8px; grid-column: 1 / -1; }
+
+  /* series bracket */
+  .series-bracket {
+    grid-column: 3 / 4;
+    display: flex; align-items: center; justify-content: flex-end;
+    font-size: 8px; color: var(--dim); padding-right: 4px;
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  /* ── MODAL ───────────────────────────────── */
+  .overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,.7); backdrop-filter: blur(6px);
+    z-index: 1000; align-items: center; justify-content: center;
+  }
+  .overlay.open { display: flex; }
+
+  .modal {
+    background: #0c0e18;
+    border: 1px solid var(--cat-color, var(--accent));
+    border-radius: 10px;
+    padding: 28px 32px;
+    max-width: 380px; width: 90%;
+    box-shadow: 0 0 40px 4px color-mix(in srgb, var(--cat-color, var(--accent)) 35%, transparent);
+    animation: pop .2s ease;
+    position: relative;
+  }
+  @keyframes pop { from { transform: scale(.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+  .modal-close {
+    position: absolute; top: 12px; right: 16px;
+    background: none; border: none; color: var(--dim);
+    font-size: 20px; cursor: pointer; line-height: 1;
+  }
+  .modal-close:hover { color: var(--text); }
+
+  .modal-num  { font-size: 11px; color: var(--dim); font-family: 'Share Tech Mono', monospace; letter-spacing: 2px; }
+  .modal-sym  { font-size: 72px; font-weight: 700; line-height: 1;
+                color: var(--cat-color, var(--accent));
+                text-shadow: 0 0 30px color-mix(in srgb, var(--cat-color, var(--accent)) 60%, transparent); }
+  .modal-name { font-size: 22px; font-weight: 600; margin-bottom: 16px; }
+  .modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 20px; font-size: 12px; }
+  .modal-row  { display: flex; flex-direction: column; gap: 2px; }
+  .modal-label { color: var(--dim); font-size: 10px; text-transform: uppercase; letter-spacing: 1px; }
+  .modal-val  { color: var(--text); }
+  .modal-cat  { display: inline-block; margin-top: 14px; font-size: 10px;
+                padding: 3px 10px; border-radius: 20px; letter-spacing: 1px;
+                background: color-mix(in srgb, var(--cat-color, var(--accent)) 20%, transparent);
+                color: var(--cat-color, var(--accent));
+                border: 1px solid color-mix(in srgb, var(--cat-color, var(--accent)) 40%, transparent); }
+  .modal-config { font-family: 'Share Tech Mono', monospace; font-size: 11px; color: var(--dim); margin-top: 10px; word-break: break-all; }
+
+  /* ── FILTER DIM ──────────────────────────── */
+  .el.dimmed { opacity: .15; }
+</style>
+</head>
+<body>
+
+<h1>ТАБЛИЦА МЕНДЕЛЕЕВА</h1>
+<p class="subtitle">Периодическая система химических элементов · 118 элементов</p>
+
+<div class="legend" id="legend"></div>
+<div class="grid" id="grid"></div>
+
+<!-- Modal -->
+<div class="overlay" id="overlay">
+  <div class="modal" id="modal">
+    <button class="modal-close" id="modal-close">×</button>
+    <div class="modal-num" id="m-num"></div>
+    <div class="modal-sym" id="m-sym"></div>
+    <div class="modal-name" id="m-name"></div>
+    <div class="modal-grid">
+      <div class="modal-row"><span class="modal-label">Масса</span><span class="modal-val" id="m-mass"></span></div>
+      <div class="modal-row"><span class="modal-label">Группа</span><span class="modal-val" id="m-group"></span></div>
+      <div class="modal-row"><span class="modal-label">Период</span><span class="modal-val" id="m-period"></span></div>
+      <div class="modal-row"><span class="modal-label">Откр.</span><span class="modal-val" id="m-year"></span></div>
+      <div class="modal-row"><span class="modal-label">Электроотриц.</span><span class="modal-val" id="m-en"></span></div>
+      <div class="modal-row"><span class="modal-label">Состояние</span><span class="modal-val" id="m-state"></span></div>
+    </div>
+    <div class="modal-config" id="m-config"></div>
+    <div class="modal-cat" id="m-cat"></div>
+  </div>
+</div>
+
+<script>
+// ─── DATA ────────────────────────────────────────────────────────────────────
+const CAT = {
+  alkali:     { label: 'Щелочные металлы',        var: '--alkali'     },
+  alkaline:   { label: 'Щелочноземельные',         var: '--alkaline'   },
+  transition: { label: 'Переходные металлы',       var: '--transition' },
+  post:       { label: 'Постпереходные металлы',   var: '--post'       },
+  metalloid:  { label: 'Металлоиды',               var: '--metalloid'  },
+  nonmetal:   { label: 'Неметаллы',                var: '--nonmetal'   },
+  halogen:    { label: 'Галогены',                 var: '--halogen'    },
+  noble:      { label: 'Благородные газы',         var: '--noble'      },
+  lanthanide: { label: 'Лантаноиды',               var: '--lanthanide' },
+  actinide:   { label: 'Актиноиды',                var: '--actinide'   },
+  unknown:    { label: 'Неизвестные',              var: '--unknown'    },
+};
+
+const ELEMENTS = [
+ // Z   sym  name_ru               mass     cat           period group  config                         en     state     year
+  [1,  'H',  'Водород',           '1.008',  'nonmetal',   1, 1,  '1s¹',                              2.20, 'Газ',    1766],
+  [2,  'He', 'Гелий',             '4.003',  'noble',      1, 18, '1s²',                              null, 'Газ',    1895],
+  [3,  'Li', 'Литий',             '6.941',  'alkali',     2, 1,  '[He] 2s¹',                         0.98, 'Твёрдое',1817],
+  [4,  'Be', 'Бериллий',          '9.012',  'alkaline',   2, 2,  '[He] 2s²',                         1.57, 'Твёрдое',1798],
+  [5,  'B',  'Бор',               '10.81',  'metalloid',  2, 13, '[He] 2s² 2p¹',                     2.04, 'Твёрдое',1808],
+  [6,  'C',  'Углерод',           '12.011', 'nonmetal',   2, 14, '[He] 2s² 2p²',                     2.55, 'Твёрдое',null],
+  [7,  'N',  'Азот',              '14.007', 'nonmetal',   2, 15, '[He] 2s² 2p³',                     3.04, 'Газ',    1772],
+  [8,  'O',  'Кислород',          '15.999', 'nonmetal',   2, 16, '[He] 2s² 2p⁴',                     3.44, 'Газ',    1774],
+  [9,  'F',  'Фтор',              '18.998', 'halogen',    2, 17, '[He] 2s² 2p⁵',                     3.98, 'Газ',    1886],
+  [10, 'Ne', 'Неон',              '20.180', 'noble',      2, 18, '[He] 2s² 2p⁶',                     null, 'Газ',    1898],
+  [11, 'Na', 'Натрий',            '22.990', 'alkali',     3, 1,  '[Ne] 3s¹',                         0.93, 'Твёрдое',1807],
+  [12, 'Mg', 'Магний',            '24.305', 'alkaline',   3, 2,  '[Ne] 3s²',                         1.31, 'Твёрдое',1755],
+  [13, 'Al', 'Алюминий',          '26.982', 'post',       3, 13, '[Ne] 3s² 3p¹',                     1.61, 'Твёрдое',1825],
+  [14, 'Si', 'Кремний',           '28.086', 'metalloid',  3, 14, '[Ne] 3s² 3p²',                     1.90, 'Твёрдое',1824],
+  [15, 'P',  'Фосфор',            '30.974', 'nonmetal',   3, 15, '[Ne] 3s² 3p³',                     2.19, 'Твёрдое',1669],
+  [16, 'S',  'Сера',              '32.065', 'nonmetal',   3, 16, '[Ne] 3s² 3p⁴',                     2.58, 'Твёрдое',null],
+  [17, 'Cl', 'Хлор',              '35.453', 'halogen',    3, 17, '[Ne] 3s² 3p⁵',                     3.16, 'Газ',    1774],
+  [18, 'Ar', 'Аргон',             '39.948', 'noble',      3, 18, '[Ne] 3s² 3p⁶',                     null, 'Газ',    1894],
+  [19, 'K',  'Калий',             '39.098', 'alkali',     4, 1,  '[Ar] 4s¹',                         0.82, 'Твёрдое',1807],
+  [20, 'Ca', 'Кальций',           '40.078', 'alkaline',   4, 2,  '[Ar] 4s²',                         1.00, 'Твёрдое',1808],
+  [21, 'Sc', 'Скандий',           '44.956', 'transition', 4, 3,  '[Ar] 3d¹ 4s²',                     1.36, 'Твёрдое',1879],
+  [22, 'Ti', 'Титан',             '47.867', 'transition', 4, 4,  '[Ar] 3d² 4s²',                     1.54, 'Твёрдое',1791],
+  [23, 'V',  'Ванадий',           '50.942', 'transition', 4, 5,  '[Ar] 3d³ 4s²',                     1.63, 'Твёрдое',1801],
+  [24, 'Cr', 'Хром',              '51.996', 'transition', 4, 6,  '[Ar] 3d⁵ 4s¹',                     1.66, 'Твёрдое',1798],
+  [25, 'Mn', 'Марганец',          '54.938', 'transition', 4, 7,  '[Ar] 3d⁵ 4s²',                     1.55, 'Твёрдое',1774],
+  [26, 'Fe', 'Железо',            '55.845', 'transition', 4, 8,  '[Ar] 3d⁶ 4s²',                     1.83, 'Твёрдое',null],
+  [27, 'Co', 'Кобальт',           '58.933', 'transition', 4, 9,  '[Ar] 3d⁷ 4s²',                     1.88, 'Твёрдое',1735],
+  [28, 'Ni', 'Никель',            '58.693', 'transition', 4, 10, '[Ar] 3d⁸ 4s²',                     1.91, 'Твёрдое',1751],
+  [29, 'Cu', 'Медь',              '63.546', 'transition', 4, 11, '[Ar] 3d¹⁰ 4s¹',                    1.90, 'Твёрдое',null],
+  [30, 'Zn', 'Цинк',              '65.38',  'transition', 4, 12, '[Ar] 3d¹⁰ 4s²',                    1.65, 'Твёрдое',null],
+  [31, 'Ga', 'Галлий',            '69.723', 'post',       4, 13, '[Ar] 3d¹⁰ 4s² 4p¹',                1.81, 'Твёрдое',1875],
+  [32, 'Ge', 'Германий',          '72.63',  'metalloid',  4, 14, '[Ar] 3d¹⁰ 4s² 4p²',                2.01, 'Твёрдое',1886],
+  [33, 'As', 'Мышьяк',            '74.922', 'metalloid',  4, 15, '[Ar] 3d¹⁰ 4s² 4p³',                2.18, 'Твёрдое',null],
+  [34, 'Se', 'Селен',             '78.96',  'nonmetal',   4, 16, '[Ar] 3d¹⁰ 4s² 4p⁴',                2.55, 'Твёрдое',1817],
+  [35, 'Br', 'Бром',              '79.904', 'halogen',    4, 17, '[Ar] 3d¹⁰ 4s² 4p⁵',                2.96, 'Жидкое', 1826],
+  [36, 'Kr', 'Криптон',           '83.798', 'noble',      4, 18, '[Ar] 3d¹⁰ 4s² 4p⁶',                3.00, 'Газ',    1898],
+  [37, 'Rb', 'Рубидий',           '85.468', 'alkali',     5, 1,  '[Kr] 5s¹',                         0.82, 'Твёрдое',1861],
+  [38, 'Sr', 'Стронций',          '87.62',  'alkaline',   5, 2,  '[Kr] 5s²',                         0.95, 'Твёрдое',1790],
+  [39, 'Y',  'Иттрий',            '88.906', 'transition', 5, 3,  '[Kr] 4d¹ 5s²',                     1.22, 'Твёрдое',1794],
+  [40, 'Zr', 'Цирконий',          '91.224', 'transition', 5, 4,  '[Kr] 4d² 5s²',                     1.33, 'Твёрдое',1789],
+  [41, 'Nb', 'Ниобий',            '92.906', 'transition', 5, 5,  '[Kr] 4d⁴ 5s¹',                     1.60, 'Твёрдое',1801],
+  [42, 'Mo', 'Молибден',          '95.96',  'transition', 5, 6,  '[Kr] 4d⁵ 5s¹',                     2.16, 'Твёрдое',1778],
+  [43, 'Tc', 'Технеций',          '(98)',   'transition', 5, 7,  '[Kr] 4d⁵ 5s²',                     1.90, 'Твёрдое',1937],
+  [44, 'Ru', 'Рутений',           '101.07', 'transition', 5, 8,  '[Kr] 4d⁷ 5s¹',                     2.20, 'Твёрдое',1844],
+  [45, 'Rh', 'Родий',             '102.91', 'transition', 5, 9,  '[Kr] 4d⁸ 5s¹',                     2.28, 'Твёрдое',1803],
+  [46, 'Pd', 'Палладий',          '106.42', 'transition', 5, 10, '[Kr] 4d¹⁰',                        2.20, 'Твёрдое',1803],
+  [47, 'Ag', 'Серебро',           '107.87', 'transition', 5, 11, '[Kr] 4d¹⁰ 5s¹',                    1.93, 'Твёрдое',null],
+  [48, 'Cd', 'Кадмий',            '112.41', 'transition', 5, 12, '[Kr] 4d¹⁰ 5s²',                    1.69, 'Твёрдое',1817],
+  [49, 'In', 'Индий',             '114.82', 'post',       5, 13, '[Kr] 4d¹⁰ 5s² 5p¹',                1.78, 'Твёрдое',1863],
+  [50, 'Sn', 'Олово',             '118.71', 'post',       5, 14, '[Kr] 4d¹⁰ 5s² 5p²',                1.96, 'Твёрдое',null],
+  [51, 'Sb', 'Сурьма',            '121.76', 'metalloid',  5, 15, '[Kr] 4d¹⁰ 5s² 5p³',                2.05, 'Твёрдое',null],
+  [52, 'Te', 'Теллур',            '127.60', 'metalloid',  5, 16, '[Kr] 4d¹⁰ 5s² 5p⁴',                2.10, 'Твёрдое',1782],
+  [53, 'I',  'Йод',               '126.90', 'halogen',    5, 17, '[Kr] 4d¹⁰ 5s² 5p⁵',                2.66, 'Твёрдое',1811],
+  [54, 'Xe', 'Ксенон',            '131.29', 'noble',      5, 18, '[Kr] 4d¹⁰ 5s² 5p⁶',                2.60, 'Газ',    1898],
+  [55, 'Cs', 'Цезий',             '132.91', 'alkali',     6, 1,  '[Xe] 6s¹',                         0.79, 'Твёрдое',1860],
+  [56, 'Ba', 'Барий',             '137.33', 'alkaline',   6, 2,  '[Xe] 6s²',                         0.89, 'Твёрдое',1808],
+  [57, 'La', 'Лантан',            '138.91', 'lanthanide', 6, 3,  '[Xe] 5d¹ 6s²',                     1.10, 'Твёрдое',1839],
+  [58, 'Ce', 'Церий',             '140.12', 'lanthanide', 6, 4,  '[Xe] 4f¹ 5d¹ 6s²',                 1.12, 'Твёрдое',1803],
+  [59, 'Pr', 'Празеодим',         '140.91', 'lanthanide', 6, 5,  '[Xe] 4f³ 6s²',                     1.13, 'Твёрдое',1885],
+  [60, 'Nd', 'Неодим',            '144.24', 'lanthanide', 6, 6,  '[Xe] 4f⁴ 6s²',                     1.14, 'Твёрдое',1885],
+  [61, 'Pm', 'Прометий',          '(145)', 'lanthanide', 6, 7,  '[Xe] 4f⁵ 6s²',                     1.13, 'Твёрдое',1945],
+  [62, 'Sm', 'Самарий',           '150.36', 'lanthanide', 6, 8,  '[Xe] 4f⁶ 6s²',                     1.17, 'Твёрдое',1879],
+  [63, 'Eu', 'Европий',           '151.96', 'lanthanide', 6, 9,  '[Xe] 4f⁷ 6s²',                     1.20, 'Твёрдое',1901],
+  [64, 'Gd', 'Гадолиний',         '157.25', 'lanthanide', 6, 10, '[Xe] 4f⁷ 5d¹ 6s²',                 1.20, 'Твёрдое',1880],
+  [65, 'Tb', 'Тербий',            '158.93', 'lanthanide', 6, 11, '[Xe] 4f⁹ 6s²',                     1.20, 'Твёрдое',1843],
+  [66, 'Dy', 'Диспрозий',         '162.50', 'lanthanide', 6, 12, '[Xe] 4f¹⁰ 6s²',                    1.22, 'Твёрдое',1886],
+  [67, 'Ho', 'Гольмий',           '164.93', 'lanthanide', 6, 13, '[Xe] 4f¹¹ 6s²',                    1.23, 'Твёрдое',1879],
+  [68, 'Er', 'Эрбий',             '167.26', 'lanthanide', 6, 14, '[Xe] 4f¹² 6s²',                    1.24, 'Твёрдое',1843],
+  [69, 'Tm', 'Тулий',             '168.93', 'lanthanide', 6, 15, '[Xe] 4f¹³ 6s²',                    1.25, 'Твёрдое',1879],
+  [70, 'Yb', 'Иттербий',          '173.04', 'lanthanide', 6, 16, '[Xe] 4f¹⁴ 6s²',                    1.10, 'Твёрдое',1878],
+  [71, 'Lu', 'Лютеций',           '174.97', 'lanthanide', 6, 17, '[Xe] 4f¹⁴ 5d¹ 6s²',                1.27, 'Твёрдое',1907],
+  [72, 'Hf', 'Гафний',            '178.49', 'transition', 6, 4,  '[Xe] 4f¹⁴ 5d² 6s²',                1.30, 'Твёрдое',1923],
+  [73, 'Ta', 'Тантал',            '180.95', 'transition', 6, 5,  '[Xe] 4f¹⁴ 5d³ 6s²',                1.50, 'Твёрдое',1802],
+  [74, 'W',  'Вольфрам',          '183.84', 'transition', 6, 6,  '[Xe] 4f¹⁴ 5d⁴ 6s²',                2.36, 'Твёрдое',1783],
+  [75, 'Re', 'Рений',             '186.21', 'transition', 6, 7,  '[Xe] 4f¹⁴ 5d⁵ 6s²',                1.90, 'Твёрдое',1925],
+  [76, 'Os', 'Осмий',             '190.23', 'transition', 6, 8,  '[Xe] 4f¹⁴ 5d⁶ 6s²',                2.20, 'Твёрдое',1803],
+  [77, 'Ir', 'Иридий',            '192.22', 'transition', 6, 9,  '[Xe] 4f¹⁴ 5d⁷ 6s²',                2.20, 'Твёрдое',1803],
+  [78, 'Pt', 'Платина',           '195.08', 'transition', 6, 10, '[Xe] 4f¹⁴ 5d⁹ 6s¹',                2.28, 'Твёрдое',1735],
+  [79, 'Au', 'Золото',            '196.97', 'transition', 6, 11, '[Xe] 4f¹⁴ 5d¹⁰ 6s¹',               2.54, 'Твёрдое',null],
+  [80, 'Hg', 'Ртуть',             '200.59', 'transition', 6, 12, '[Xe] 4f¹⁴ 5d¹⁰ 6s²',               2.00, 'Жидкое', null],
+  [81, 'Tl', 'Таллий',            '204.38', 'post',       6, 13, '[Xe] 4f¹⁴ 5d¹⁰ 6s² 6p¹',           1.62, 'Твёрдое',1861],
+  [82, 'Pb', 'Свинец',            '207.2',  'post',       6, 14, '[Xe] 4f¹⁴ 5d¹⁰ 6s² 6p²',           2.33, 'Твёрдое',null],
+  [83, 'Bi', 'Висмут',            '208.98', 'post',       6, 15, '[Xe] 4f¹⁴ 5d¹⁰ 6s² 6p³',           2.02, 'Твёрдое',1400],
+  [84, 'Po', 'Полоний',           '(209)', 'post',       6, 16, '[Xe] 4f¹⁴ 5d¹⁰ 6s² 6p⁴',           2.00, 'Твёрдое',1898],
+  [85, 'At', 'Астат',             '(210)', 'halogen',    6, 17, '[Xe] 4f¹⁴ 5d¹⁰ 6s² 6p⁵',           2.20, 'Твёрдое',1940],
+  [86, 'Rn', 'Радон',             '(222)', 'noble',      6, 18, '[Xe] 4f¹⁴ 5d¹⁰ 6s² 6p⁶',           null, 'Газ',    1900],
+  [87, 'Fr', 'Франций',           '(223)', 'alkali',     7, 1,  '[Rn] 7s¹',                         0.70, 'Твёрдое',1939],
+  [88, 'Ra', 'Радий',             '(226)', 'alkaline',   7, 2,  '[Rn] 7s²',                         0.90, 'Твёрдое',1898],
+  [89, 'Ac', 'Актиний',           '(227)', 'actinide',   7, 3,  '[Rn] 6d¹ 7s²',                     1.10, 'Твёрдое',1899],
+  [90, 'Th', 'Торий',             '232.04', 'actinide',   7, 4,  '[Rn] 6d² 7s²',                     1.30, 'Твёрдое',1829],
+  [91, 'Pa', 'Протактиний',       '231.04', 'actinide',   7, 5,  '[Rn] 5f² 6d¹ 7s²',                 1.50, 'Твёрдое',1913],
+  [92, 'U',  'Уран',              '238.03', 'actinide',   7, 6,  '[Rn] 5f³ 6d¹ 7s²',                 1.38, 'Твёрдое',1789],
+  [93, 'Np', 'Нептуний',          '(237)', 'actinide',   7, 7,  '[Rn] 5f⁴ 6d¹ 7s²',                 1.36, 'Твёрдое',1940],
+  [94, 'Pu', 'Плутоний',          '(244)', 'actinide',   7, 8,  '[Rn] 5f⁶ 7s²',                     1.28, 'Твёрдое',1940],
+  [95, 'Am', 'Америций',          '(243)', 'actinide',   7, 9,  '[Rn] 5f⁷ 7s²',                     1.30, 'Твёрдое',1944],
+  [96, 'Cm', 'Кюрий',             '(247)', 'actinide',   7, 10, '[Rn] 5f⁷ 6d¹ 7s²',                 1.30, 'Твёрдое',1944],
+  [97, 'Bk', 'Берклий',           '(247)', 'actinide',   7, 11, '[Rn] 5f⁹ 7s²',                     1.30, 'Твёрдое',1949],
+  [98, 'Cf', 'Калифорний',        '(251)', 'actinide',   7, 12, '[Rn] 5f¹⁰ 7s²',                    1.30, 'Твёрдое',1950],
+  [99, 'Es', 'Эйнштейний',        '(252)', 'actinide',   7, 13, '[Rn] 5f¹¹ 7s²',                    1.30, 'Твёрдое',1952],
+  [100,'Fm', 'Фермий',            '(257)', 'actinide',   7, 14, '[Rn] 5f¹² 7s²',                    1.30, 'Твёрдое',1952],
+  [101,'Md', 'Менделевий',        '(258)', 'actinide',   7, 15, '[Rn] 5f¹³ 7s²',                    1.30, 'Твёрдое',1955],
+  [102,'No', 'Нобелий',           '(259)', 'actinide',   7, 16, '[Rn] 5f¹⁴ 7s²',                    1.30, 'Твёрдое',1958],
+  [103,'Lr', 'Лоуренсий',         '(266)', 'actinide',   7, 17, '[Rn] 5f¹⁴ 7p¹',                    1.30, 'Твёрдое',1961],
+  [104,'Rf', 'Резерфордий',       '(267)', 'transition', 7, 4,  '[Rn] 5f¹⁴ 6d² 7s²',                null, 'Твёрдое',1969],
+  [105,'Db', 'Дубний',            '(268)', 'transition', 7, 5,  '[Rn] 5f¹⁴ 6d³ 7s²',                null, 'Твёрдое',1970],
+  [106,'Sg', 'Сиборгий',          '(271)', 'transition', 7, 6,  '[Rn] 5f¹⁴ 6d⁴ 7s²',                null, 'Твёрдое',1974],
+  [107,'Bh', 'Борий',             '(272)', 'transition', 7, 7,  '[Rn] 5f¹⁴ 6d⁵ 7s²',                null, 'Твёрдое',1981],
+  [108,'Hs', 'Хассий',            '(270)', 'transition', 7, 8,  '[Rn] 5f¹⁴ 6d⁶ 7s²',                null, 'Твёрдое',1984],
+  [109,'Mt', 'Майтнерий',         '(278)', 'unknown',    7, 9,  '[Rn] 5f¹⁴ 6d⁷ 7s²',                null, 'Неизв.', 1982],
+  [110,'Ds', 'Дармштадтий',       '(281)', 'unknown',    7, 10, '[Rn] 5f¹⁴ 6d⁹ 7s¹',                null, 'Неизв.', 1994],
+  [111,'Rg', 'Рентгений',         '(282)', 'unknown',    7, 11, '[Rn] 5f¹⁴ 6d¹⁰ 7s¹',               null, 'Неизв.', 1994],
+  [112,'Cn', 'Коперниций',        '(285)', 'transition', 7, 12, '[Rn] 5f¹⁴ 6d¹⁰ 7s²',               null, 'Газ',    1996],
+  [113,'Nh', 'Нихоний',           '(286)', 'unknown',    7, 13, '[Rn] 5f¹⁴ 6d¹⁰ 7s² 7p¹',           null, 'Неизв.', 2004],
+  [114,'Fl', 'Флеровий',          '(289)', 'unknown',    7, 14, '[Rn] 5f¹⁴ 6d¹⁰ 7s² 7p²',           null, 'Неизв.', 1999],
+  [115,'Mc', 'Московий',          '(290)', 'unknown',    7, 15, '[Rn] 5f¹⁴ 6d¹⁰ 7s² 7p³',           null, 'Неизв.', 2003],
+  [116,'Lv', 'Ливерморий',        '(293)', 'unknown',    7, 16, '[Rn] 5f¹⁴ 6d¹⁰ 7s² 7p⁴',           null, 'Неизв.', 2000],
+  [117,'Ts', 'Теннессин',         '(294)', 'unknown',    7, 17, '[Rn] 5f¹⁴ 6d¹⁰ 7s² 7p⁵',           null, 'Неизв.', 2010],
+  [118,'Og', 'Оганессон',         '(294)', 'unknown',    7, 18, '[Rn] 5f¹⁴ 6d¹⁰ 7s² 7p⁶',           null, 'Газ',    2002],
+];
+
+// resolve CSS var value
+function catColor(cat) {
+  const v = CAT[cat]?.var || '--unknown';
+  return getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+}
+
+// ─── BUILD LEGEND ──────────────────────────────────────────────────────────
+const legend = document.getElementById('legend');
+Object.entries(CAT).forEach(([key, {label, var: v}]) => {
+  const color = getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  const item = document.createElement('div');
+  item.className = 'legend-item';
+  item.dataset.cat = key;
+  item.innerHTML = `<div class="legend-dot" style="background:${color}"></div>${label}`;
+  item.addEventListener('click', () => filterCat(key));
+  legend.appendChild(item);
+});
+
+// ─── BUILD GRID ────────────────────────────────────────────────────────────
+// Map elements by [period][group]
+const byPG = {};
+ELEMENTS.forEach(el => {
+  const [z, sym, name, mass, cat, period, group] = el;
+  if (!byPG[period]) byPG[period] = {};
+  byPG[period][group] = el;
+});
+
+// lanthanide/actinide separate rows
+const lant = ELEMENTS.filter(e => e[4] === 'lanthanide' && e[2] !== 'Лантан');
+const acti = ELEMENTS.filter(e => e[4] === 'actinide'   && e[2] !== 'Актиний');
+
+const grid = document.getElementById('grid');
+
+function makeCell(el) {
+  const [z, sym, name, mass, cat, period, group, config, en, state, year] = el;
+  const color = catColor(cat);
+  const div = document.createElement('div');
+  div.className = 'el';
+  div.dataset.z = z; div.dataset.cat = cat;
+  div.style.setProperty('--cat-color', color);
+  div.innerHTML = `
+    <span class="num">${z}</span>
+    <span class="sym">${sym}</span>
+    <span class="name">${name}</span>
+    <span class="mass">${mass}</span>`;
+  div.addEventListener('click', () => openModal(el));
+  return div;
+}
+
+function spacer(cols = 1) {
+  const d = document.createElement('div');
+  d.className = 'el spacer';
+  d.style.gridColumn = `span ${cols}`;
+  return d;
+}
+
+// Period rows 1–7
+for (let p = 1; p <= 7; p++) {
+  for (let g = 1; g <= 18; g++) {
+    // gaps in standard layout
+    if (p <= 2 && g >= 3 && g <= 12) { if (g === 3) grid.appendChild(spacer(10)); continue; }
+    const el = byPG[p]?.[g];
+    // skip lanthanide/actinide in main grid (shown below)
+    if (el && (el[4] === 'lanthanide' || el[4] === 'actinide') && el[2] !== 'Лантан' && el[2] !== 'Актиний') {
+      grid.appendChild(spacer(1)); continue;
+    }
+    if (el) grid.appendChild(makeCell(el));
+    else     grid.appendChild(spacer(1));
+  }
+}
+
+// Gap row
+const gap1 = document.createElement('div'); gap1.className = 'gap-row'; grid.appendChild(gap1);
+
+// Lanthanide row: cols 1-2 spacer, cols 3-17 = 15 elements (La is in main grid)
+grid.appendChild(spacer(2));
+const lblLa = document.createElement('div');
+lblLa.className = 'el lbl'; lblLa.textContent = '57–71'; grid.appendChild(lblLa);
+lant.forEach(e => grid.appendChild(makeCell(e)));
+grid.appendChild(spacer(1));
+
+// Actinide row
+grid.appendChild(spacer(2));
+const lblAc = document.createElement('div');
+lblAc.className = 'el lbl'; lblAc.textContent = '89–103'; grid.appendChild(lblAc);
+acti.forEach(e => grid.appendChild(makeCell(e)));
+grid.appendChild(spacer(1));
+
+// ─── FILTER ────────────────────────────────────────────────────────────────
+let activeFilter = null;
+function filterCat(cat) {
+  if (activeFilter === cat) {
+    activeFilter = null;
+    document.querySelectorAll('.el[data-z]').forEach(el => el.classList.remove('dimmed'));
+  } else {
+    activeFilter = cat;
+    document.querySelectorAll('.el[data-z]').forEach(el => {
+      el.classList.toggle('dimmed', el.dataset.cat !== cat);
+    });
+  }
+}
+
+// ─── MODAL ─────────────────────────────────────────────────────────────────
+const overlay = document.getElementById('overlay');
+const modal   = document.getElementById('modal');
+
+function openModal(el) {
+  const [z, sym, name, mass, cat, period, group, config, en, state, year] = el;
+  const color = catColor(cat);
+  modal.style.setProperty('--cat-color', color);
+  document.getElementById('m-num').textContent  = `Элемент № ${z}`;
+  document.getElementById('m-sym').textContent  = sym;
+  document.getElementById('m-name').textContent = name;
+  document.getElementById('m-mass').textContent = mass + ' а.е.м.';
+  document.getElementById('m-group').textContent  = group;
+  document.getElementById('m-period').textContent = period;
+  document.getElementById('m-year').textContent   = year ? year : 'Древн.';
+  document.getElementById('m-en').textContent    = en !== null ? en : '—';
+  document.getElementById('m-state').textContent = state;
+  document.getElementById('m-config').textContent = 'e⁻: ' + config;
+  document.getElementById('m-cat').textContent  = CAT[cat]?.label || cat;
+  overlay.classList.add('open');
+}
+
+document.getElementById('modal-close').addEventListener('click', () => overlay.classList.remove('open'));
+overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('open'); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') overlay.classList.remove('open'); });
+</script>
+</body>
+</html>
